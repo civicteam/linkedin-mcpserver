@@ -434,3 +434,243 @@ export interface AdAnalyticsResult {
     total: number
   }
 }
+
+/**
+ * Creative Management types (extended)
+ */
+
+export type CreativeIntendedStatus = 'ACTIVE' | 'PAUSED' | 'DRAFT' | 'ARCHIVED' | 'CANCELED' | 'PENDING_DELETION'
+
+export type CreativeReviewStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'NEEDS_REVIEW'
+
+export type LeadgenCallToActionLabel =
+  | 'APPLY'
+  | 'DOWNLOAD'
+  | 'VIEW_QUOTE'
+  | 'LEARN_MORE'
+  | 'SIGN_UP'
+  | 'SUBSCRIBE'
+  | 'REGISTER'
+  | 'REQUEST_DEMO'
+  | 'JOIN'
+  | 'ATTEND'
+  | 'UNLOCK_FULL_DOCUMENT'
+
+export interface CreateCreativeRequest {
+  campaign: string
+  intendedStatus?: CreativeIntendedStatus
+  name?: string
+  content?: {
+    reference?: string
+  }
+  leadgenCallToAction?: {
+    destination: string
+    label: LeadgenCallToActionLabel
+  }
+}
+
+export interface UpdateCreativeRequest {
+  intendedStatus?: CreativeIntendedStatus
+  name?: string
+}
+
+export interface CreativeResponse {
+  id: string
+  campaign: string
+  account: string
+  intendedStatus: CreativeIntendedStatus
+  name?: string
+  content?: {
+    reference?: string
+  }
+  isServing: boolean
+  servingHoldReasons?: string[]
+  review?: {
+    status: CreativeReviewStatus
+    rejectionReasons?: string[]
+  }
+  createdAt: number
+  createdBy: string
+  lastModifiedAt: number
+  lastModifiedBy?: string
+}
+
+/**
+ * Conversions API types
+ */
+
+export type ConversionType =
+  | 'ADD_TO_CART'
+  | 'DOWNLOAD'
+  | 'INSTALL'
+  | 'KEY_PAGE_VIEW'
+  | 'LEAD'
+  | 'PURCHASE'
+  | 'SIGN_UP'
+  | 'ADD_BILLING_INFO'
+  | 'BOOK_APPOINTMENT'
+  | 'COMPLETE_SIGNUP'
+  | 'SUBMIT_APPLICATION'
+  | 'PHONE_CALL'
+  | 'INVITE'
+  | 'LOGIN'
+  | 'SHARE'
+  | 'DONATE'
+  | 'ADD_TO_LIST'
+  | 'START_TRIAL'
+  | 'OUTBOUND_CLICK'
+  | 'CONTACT'
+  | 'QUALIFIED_LEAD'
+  | 'SAVE'
+  | 'START_CHECKOUT'
+  | 'SCHEDULE'
+  | 'VIEW_CONTENT'
+  | 'VIEW_VIDEO'
+  | 'REQUEST_QUOTE'
+  | 'SEARCH'
+  | 'SUBSCRIBE'
+  | 'AD_CLICK'
+  | 'AD_VIEW'
+
+export type AttributionType = 'LAST_TOUCH_BY_CAMPAIGN' | 'LAST_TOUCH_BY_CONVERSION'
+
+export interface CreateConversionRuleRequest {
+  name: string
+  account: string
+  conversionMethod: 'CONVERSIONS_API'
+  type: ConversionType
+  enabled?: boolean
+  postClickAttributionWindowSize?: 1 | 7 | 30 | 90 | 365
+  viewThroughAttributionWindowSize?: 1 | 7 | 30 | 90 | 365
+  attributionType?: AttributionType
+}
+
+export interface ConversionRule {
+  id: number
+  name: string
+  account: string
+  type: ConversionType
+  conversionMethod: string
+  enabled: boolean
+  attributionType: AttributionType
+  postClickAttributionWindowSize: number
+  viewThroughAttributionWindowSize: number
+}
+
+export interface ConversionRulesResult {
+  elements: ConversionRule[]
+}
+
+export type ConversionUserIdType =
+  | 'SHA256_EMAIL'
+  | 'LINKEDIN_FIRST_PARTY_ADS_TRACKING_UUID'
+  | 'ACXIOM_ID'
+  | 'ORACLE_MOAT_ID'
+
+export interface StreamConversionEventRequest {
+  conversion: string
+  conversionHappenedAt: number
+  conversionValue?: {
+    currencyCode: string
+    amount: string
+  }
+  eventId?: string
+  user: {
+    userIds: Array<{
+      idType: ConversionUserIdType
+      idValue: string
+    }>
+    userInfo?: {
+      firstName?: string
+      lastName?: string
+      companyName?: string
+      title?: string
+      countryCode?: string
+    }
+  }
+}
+
+/**
+ * Campaign/Campaign Group Update types
+ */
+
+export interface UpdateCampaignRequest {
+  status?: 'ACTIVE' | 'PAUSED' | 'ARCHIVED' | 'PENDING_DELETION'
+  name?: string
+  dailyBudget?: {
+    amount: string
+    currencyCode: string
+  }
+  totalBudget?: {
+    amount: string
+    currencyCode: string
+  } | null
+  unitCost?: {
+    amount: string
+    currencyCode: string
+  }
+  runSchedule?: {
+    start: number
+    end?: number
+  }
+  audienceExpansionEnabled?: boolean
+  offsiteDeliveryEnabled?: boolean
+}
+
+export interface UpdateCampaignGroupRequest {
+  status?: 'ACTIVE' | 'PAUSED' | 'ARCHIVED' | 'PENDING_DELETION'
+  name?: string
+  totalBudget?: {
+    amount: string
+    currencyCode: string
+  } | null
+  runSchedule?: {
+    start: number
+    end?: number
+  }
+}
+
+/**
+ * Matched Audiences / DMP Segments types
+ * NOTE: Requires separate approval and rw_dmp_segments scope
+ */
+
+export type DmpSegmentType = 'LIST_UPLOAD' | 'STREAMING'
+
+export type DmpSegmentStatus = 'BUILDING' | 'UPDATING' | 'READY' | 'EXPIRED' | 'FAILED' | 'ERROR' | 'ARCHIVED'
+
+export interface CreateDmpSegmentRequest {
+  account: string
+  name: string
+  type: DmpSegmentType
+  sourcePlatform?: string
+}
+
+export interface DmpSegment {
+  id: string
+  account: string
+  name: string
+  type: DmpSegmentType
+  status: DmpSegmentStatus
+  audienceCount?: number
+  createdAt: number
+  lastModifiedAt: number
+}
+
+export interface DmpSegmentsResult {
+  elements: DmpSegment[]
+}
+
+export interface AddDmpSegmentUsersRequest {
+  users: Array<{
+    idType: 'SHA256_EMAIL' | 'SHA512_EMAIL'
+    idValue: string
+  }>
+}
+
+export interface AddDmpSegmentCompaniesRequest {
+  companies: Array<{
+    companyName?: string
+    companyDomain?: string
+  }>
+}

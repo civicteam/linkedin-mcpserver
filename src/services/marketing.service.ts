@@ -12,10 +12,15 @@ import type {
   AdAnalyticsResult,
   Campaign,
   CampaignGroup,
+  ConversionRule,
+  ConversionRulesResult,
   CreateAdAccountParams,
   CreateCampaignGroupParams,
   CreateCampaignParams,
   Creative,
+  CreativeResponse,
+  DmpSegment,
+  DmpSegmentsResult,
   SearchAdAccountsParams
 } from '../types/linkedin.js'
 
@@ -404,5 +409,391 @@ export class MarketingService {
     }
 
     return this.makeRequest<AdAnalyticsResult>('get', '/rest/adAnalytics', queryParams)
+  }
+
+  // ===== Creative Management =====
+
+  /**
+   * Creates a new creative in a campaign
+   *
+   * Endpoint: POST /rest/adAccounts/{adAccountId}/creatives
+   * Docs: https://learn.microsoft.com/en-us/linkedin/marketing/integrations/ads/account-structure/create-and-manage-creatives
+   */
+  public async createCreative(
+    accountId: string,
+    params: {
+      campaign: string
+      contentReference?: string
+      intendedStatus?: string
+      name?: string
+      leadgenFormUrn?: string
+      leadgenCallToAction?: string
+    }
+  ): Promise<CreativeResponse> {
+    const creativeData: Record<string, unknown> = {
+      campaign: params.campaign,
+      intendedStatus: params.intendedStatus || 'DRAFT'
+    }
+
+    if (params.contentReference) {
+      creativeData.content = { reference: params.contentReference }
+    }
+
+    if (params.name) {
+      creativeData.name = params.name
+    }
+
+    if (params.leadgenFormUrn && params.leadgenCallToAction) {
+      creativeData.leadgenCallToAction = {
+        destination: params.leadgenFormUrn,
+        label: params.leadgenCallToAction
+      }
+    }
+
+    return this.makeRequest<CreativeResponse>(
+      'post',
+      `/rest/adAccounts/${encodeURIComponent(accountId)}/creatives`,
+      undefined,
+      creativeData
+    )
+  }
+
+  /**
+   * Updates an existing creative (status, name)
+   *
+   * Endpoint: POST /rest/adAccounts/{adAccountId}/creatives/{creativeId}
+   * Header: X-RestLi-Method: PARTIAL_UPDATE
+   */
+  public async updateCreative(
+    accountId: string,
+    creativeId: string,
+    params: { intendedStatus?: string; name?: string }
+  ): Promise<CreativeResponse> {
+    const patchData: Record<string, unknown> = {}
+    if (params.intendedStatus) patchData.intendedStatus = params.intendedStatus
+    if (params.name) patchData.name = params.name
+
+    return this.makePartialUpdateRequest<CreativeResponse>(
+      `/rest/adAccounts/${encodeURIComponent(accountId)}/creatives/${encodeURIComponent(creativeId)}`,
+      patchData
+    )
+  }
+
+  /**
+   * Deletes a creative (sets status to PENDING_DELETION for non-DRAFT, or hard deletes DRAFT)
+   *
+   * Endpoint: DELETE /rest/adAccounts/{adAccountId}/creatives/{creativeId} (for DRAFT)
+   * Or: POST with PARTIAL_UPDATE setting intendedStatus to PENDING_DELETION
+   */
+  public async deleteCreative(accountId: string, creativeId: string): Promise<void> {
+    await this.makePartialUpdateRequest(
+      `/rest/adAccounts/${encodeURIComponent(accountId)}/creatives/${encodeURIComponent(creativeId)}`,
+      { intendedStatus: 'PENDING_DELETION' }
+    )
+  }
+
+  // ===== Campaign Updates =====
+
+  /**
+   * Updates a campaign (budget, schedule, status, etc.)
+   *
+   * Endpoint: POST /rest/adAccounts/{adAccountId}/adCampaigns/{campaignId}
+   * Header: X-RestLi-Method: PARTIAL_UPDATE
+   */
+  public async updateCampaign(
+    accountId: string,
+    campaignId: string,
+    params: {
+      name?: string
+      status?: string
+      dailyBudget?: { amount: string; currencyCode: string }
+      totalBudget?: { amount: string; currencyCode: string } | null
+      unitCost?: { amount: string; currencyCode: string }
+      runScheduleEnd?: number
+      audienceExpansionEnabled?: boolean
+      offsiteDeliveryEnabled?: boolean
+    }
+  ): Promise<Campaign> {
+    const patchData: Record<string, unknown> = {}
+    const deleteFields: string[] = []
+
+    if (params.name) patchData.name = params.name
+    if (params.status) patchData.status = params.status
+    if (params.dailyBudget) patchData.dailyBudget = params.dailyBudget
+    if (params.totalBudget === null) {
+      deleteFields.push('totalBudget')
+    } else if (params.totalBudget) {
+      patchData.totalBudget = params.totalBudget
+    }
+    if (params.unitCost) patchData.unitCost = params.unitCost
+    if (params.runScheduleEnd) {
+      patchData.runSchedule = { end: params.runScheduleEnd }
+    }
+    if (params.audienceExpansionEnabled !== undefined) {
+      patchData.audienceExpansionEnabled = params.audienceExpansionEnabled
+    }
+    if (params.offsiteDeliveryEnabled !== undefined) {
+      patchData.offsiteDeliveryEnabled = params.offsiteDeliveryEnabled
+    }
+
+    return this.makePartialUpdateRequest<Campaign>(
+      `/rest/adAccounts/${encodeURIComponent(accountId)}/adCampaigns/${encodeURIComponent(campaignId)}`,
+      patchData,
+      deleteFields.length > 0 ? deleteFields : undefined
+    )
+  }
+
+  /**
+   * Updates a campaign group (budget, schedule, status, etc.)
+   *
+   * Endpoint: POST /rest/adAccounts/{adAccountId}/adCampaignGroups/{campaignGroupId}
+   * Header: X-RestLi-Method: PARTIAL_UPDATE
+   */
+  public async updateCampaignGroup(
+    accountId: string,
+    campaignGroupId: string,
+    params: {
+      name?: string
+      status?: string
+      totalBudget?: { amount: string; currencyCode: string } | null
+      runScheduleEnd?: number
+    }
+  ): Promise<CampaignGroup> {
+    const patchData: Record<string, unknown> = {}
+    const deleteFields: string[] = []
+
+    if (params.name) patchData.name = params.name
+    if (params.status) patchData.status = params.status
+    if (params.totalBudget === null) {
+      deleteFields.push('totalBudget')
+    } else if (params.totalBudget) {
+      patchData.totalBudget = params.totalBudget
+    }
+    if (params.runScheduleEnd) {
+      patchData.runSchedule = { end: params.runScheduleEnd }
+    }
+
+    return this.makePartialUpdateRequest<CampaignGroup>(
+      `/rest/adAccounts/${encodeURIComponent(accountId)}/adCampaignGroups/${encodeURIComponent(campaignGroupId)}`,
+      patchData,
+      deleteFields.length > 0 ? deleteFields : undefined
+    )
+  }
+
+  // ===== Conversions API =====
+
+  /**
+   * Creates a conversion rule for tracking
+   *
+   * Endpoint: POST /rest/conversions
+   * Docs: https://learn.microsoft.com/en-us/linkedin/marketing/integrations/ads-reporting/conversions-api
+   */
+  public async createConversionRule(params: {
+    name: string
+    account: string
+    type: string
+    postClickAttributionWindowSize?: number
+    viewThroughAttributionWindowSize?: number
+    attributionType?: string
+  }): Promise<ConversionRule> {
+    const ruleData = {
+      name: params.name,
+      account: params.account,
+      conversionMethod: 'CONVERSIONS_API',
+      type: params.type,
+      postClickAttributionWindowSize: params.postClickAttributionWindowSize || 30,
+      viewThroughAttributionWindowSize: params.viewThroughAttributionWindowSize || 7,
+      attributionType: params.attributionType || 'LAST_TOUCH_BY_CAMPAIGN'
+    }
+
+    return this.makeRequest<ConversionRule>('post', '/rest/conversions', undefined, ruleData)
+  }
+
+  /**
+   * Gets conversion rules for an ad account
+   *
+   * Endpoint: GET /rest/conversions?q=account&account={accountUrn}
+   */
+  public async getConversionRules(accountUrn: string): Promise<ConversionRulesResult> {
+    return this.makeRequest<ConversionRulesResult>('get', '/rest/conversions', {
+      q: 'account',
+      account: encodeURIComponent(accountUrn)
+    })
+  }
+
+  /**
+   * Streams a conversion event
+   *
+   * Endpoint: POST /rest/conversionEvents
+   */
+  public async streamConversionEvent(params: {
+    conversion: string
+    conversionHappenedAt: number
+    userIdType: string
+    userIdValue: string
+    eventId?: string
+    conversionValue?: { currencyCode: string; amount: string }
+    userInfo?: { firstName?: string; lastName?: string; countryCode?: string }
+  }): Promise<void> {
+    const eventData: Record<string, unknown> = {
+      conversion: params.conversion,
+      conversionHappenedAt: params.conversionHappenedAt,
+      user: {
+        userIds: [
+          {
+            idType: params.userIdType,
+            idValue: params.userIdValue
+          }
+        ]
+      }
+    }
+
+    if (params.eventId) {
+      eventData.eventId = params.eventId
+    }
+
+    if (params.conversionValue) {
+      eventData.conversionValue = params.conversionValue
+    }
+
+    if (params.userInfo) {
+      (eventData.user as Record<string, unknown>).userInfo = params.userInfo
+    }
+
+    await this.makeRequest<void>('post', '/rest/conversionEvents', undefined, eventData)
+  }
+
+  /**
+   * Associates a campaign with a conversion rule
+   *
+   * Endpoint: PUT /rest/campaignConversions/(campaign:{campaignUrn},conversion:{conversionUrn})
+   */
+  public async associateCampaignConversion(campaignUrn: string, conversionUrn: string): Promise<void> {
+    const now = new Date()
+    const version = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
+
+    await this.axiosClient.request({
+      method: 'put',
+      url: `/rest/campaignConversions/(campaign:${encodeURIComponent(campaignUrn)},conversion:${encodeURIComponent(conversionUrn)})`,
+      headers: {
+        'Authorization': `Bearer ${this.tokenService.getAccessToken()}`,
+        'Content-Type': 'application/json',
+        'X-Restli-Protocol-Version': '2.0.0',
+        'LinkedIn-Version': version
+      },
+      data: {
+        campaign: campaignUrn,
+        conversion: conversionUrn
+      }
+    })
+  }
+
+  // ===== Matched Audiences / DMP Segments =====
+  // NOTE: Requires rw_dmp_segments scope (separate approval required)
+
+  /**
+   * Creates a DMP segment (audience)
+   *
+   * Endpoint: POST /rest/dmpSegments
+   * Docs: https://learn.microsoft.com/en-us/linkedin/marketing/integrations/matched-audiences
+   */
+  public async createAudience(params: {
+    account: string
+    name: string
+    type: 'LIST_UPLOAD' | 'STREAMING'
+  }): Promise<DmpSegment> {
+    return this.makeRequest<DmpSegment>('post', '/rest/dmpSegments', undefined, {
+      account: params.account,
+      name: params.name,
+      type: params.type
+    })
+  }
+
+  /**
+   * Gets DMP segments (audiences) for an ad account
+   *
+   * Endpoint: GET /rest/dmpSegments?q=account&account={accountUrn}
+   */
+  public async getAudiences(accountUrn: string): Promise<DmpSegmentsResult> {
+    return this.makeRequest<DmpSegmentsResult>('get', '/rest/dmpSegments', {
+      q: 'account',
+      account: encodeURIComponent(accountUrn)
+    })
+  }
+
+  /**
+   * Adds users to a DMP segment
+   *
+   * Endpoint: POST /rest/dmpSegments/{segmentId}/users
+   */
+  public async addAudienceUsers(
+    segmentId: string,
+    users: Array<{ idType: string; idValue: string }>
+  ): Promise<void> {
+    await this.makeRequest<void>(
+      'post',
+      `/rest/dmpSegments/${encodeURIComponent(segmentId)}/users`,
+      undefined,
+      { elements: users }
+    )
+  }
+
+  /**
+   * Adds companies to a DMP segment
+   *
+   * Endpoint: POST /rest/dmpSegments/{segmentId}/companies
+   */
+  public async addAudienceCompanies(
+    segmentId: string,
+    companies: Array<{ companyName?: string; companyDomain?: string }>
+  ): Promise<void> {
+    await this.makeRequest<void>(
+      'post',
+      `/rest/dmpSegments/${encodeURIComponent(segmentId)}/companies`,
+      undefined,
+      { elements: companies }
+    )
+  }
+
+  // ===== Helper Methods =====
+
+  /**
+   * Makes a PARTIAL_UPDATE request (for updating entities)
+   */
+  private async makePartialUpdateRequest<T>(
+    path: string,
+    setFields: Record<string, unknown>,
+    deleteFields?: string[]
+  ): Promise<T> {
+    await this.tokenService.authenticate()
+    const accessToken = this.tokenService.getAccessToken()
+
+    const now = new Date()
+    const version = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
+
+    const patchBody: Record<string, unknown> = {
+      patch: {
+        $set: setFields
+      }
+    }
+
+    if (deleteFields && deleteFields.length > 0) {
+      (patchBody.patch as Record<string, unknown>).$delete = deleteFields
+    }
+
+    const response = await this.axiosClient.request<T>({
+      method: 'post',
+      url: path,
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-Restli-Protocol-Version': '2.0.0',
+        'LinkedIn-Version': version,
+        'X-RestLi-Method': 'PARTIAL_UPDATE'
+      },
+      data: patchBody
+    })
+
+    return response.data
   }
 }

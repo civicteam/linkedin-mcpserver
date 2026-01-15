@@ -531,6 +531,358 @@ export class LinkedInMcpServer {
         }
       }
     )
+
+    // ===== Creative Management Tools =====
+
+    // Create Creative Tool
+    this.server.tool(
+      'create-creative',
+      'Create a new creative (ad) in a LinkedIn campaign',
+      linkedinApiSchemas.createCreative,
+      async (params) => {
+        this.logger.info('Creating Creative', { campaign: params.campaign })
+        try {
+          await this.ensureAuthenticated()
+          const result = await this.marketingService.createCreative(params.accountId, {
+            campaign: params.campaign,
+            contentReference: params.contentReference,
+            intendedStatus: params.intendedStatus,
+            name: params.name,
+            leadgenFormUrn: params.leadgenFormUrn,
+            leadgenCallToAction: params.leadgenCallToAction
+          })
+          return this.createResourceResponse(result)
+        } catch (error) {
+          this.logger.error('Create Creative Failed', error)
+          throw error
+        }
+      }
+    )
+
+    // Update Creative Tool
+    this.server.tool(
+      'update-creative',
+      'Update an existing creative (change status or name)',
+      linkedinApiSchemas.updateCreative,
+      async (params) => {
+        this.logger.info('Updating Creative', { creativeId: params.creativeId })
+        try {
+          await this.ensureAuthenticated()
+          const result = await this.marketingService.updateCreative(
+            params.accountId,
+            params.creativeId,
+            {
+              intendedStatus: params.intendedStatus,
+              name: params.name
+            }
+          )
+          return this.createResourceResponse(result)
+        } catch (error) {
+          this.logger.error('Update Creative Failed', error)
+          throw error
+        }
+      }
+    )
+
+    // Delete Creative Tool
+    this.server.tool(
+      'delete-creative',
+      'Delete a creative (marks for deletion)',
+      linkedinApiSchemas.deleteCreative,
+      async (params) => {
+        this.logger.info('Deleting Creative', { creativeId: params.creativeId })
+        try {
+          await this.ensureAuthenticated()
+          await this.marketingService.deleteCreative(params.accountId, params.creativeId)
+          return this.createResourceResponse({ success: true, message: 'Creative marked for deletion' })
+        } catch (error) {
+          this.logger.error('Delete Creative Failed', error)
+          throw error
+        }
+      }
+    )
+
+    // ===== Campaign Update Tools =====
+
+    // Update Campaign Tool
+    this.server.tool(
+      'update-campaign',
+      'Update a LinkedIn campaign (budget, schedule, status, targeting options)',
+      linkedinApiSchemas.updateCampaign,
+      async (params) => {
+        this.logger.info('Updating Campaign', { campaignId: params.campaignId })
+        try {
+          await this.ensureAuthenticated()
+          const updateParams: {
+            name?: string
+            status?: string
+            dailyBudget?: { amount: string; currencyCode: string }
+            totalBudget?: { amount: string; currencyCode: string } | null
+            unitCost?: { amount: string; currencyCode: string }
+            runScheduleEnd?: number
+            audienceExpansionEnabled?: boolean
+            offsiteDeliveryEnabled?: boolean
+          } = {}
+
+          if (params.name) updateParams.name = params.name
+          if (params.status) updateParams.status = params.status
+          if (params.dailyBudgetAmount && params.dailyBudgetCurrency) {
+            updateParams.dailyBudget = { amount: params.dailyBudgetAmount, currencyCode: params.dailyBudgetCurrency }
+          }
+          if (params.totalBudgetAmount === 'REMOVE') {
+            updateParams.totalBudget = null
+          } else if (params.totalBudgetAmount && params.totalBudgetCurrency) {
+            updateParams.totalBudget = { amount: params.totalBudgetAmount, currencyCode: params.totalBudgetCurrency }
+          }
+          if (params.unitCostAmount && params.unitCostCurrency) {
+            updateParams.unitCost = { amount: params.unitCostAmount, currencyCode: params.unitCostCurrency }
+          }
+          if (params.endTime) updateParams.runScheduleEnd = params.endTime
+          if (params.audienceExpansionEnabled !== undefined) {
+            updateParams.audienceExpansionEnabled = params.audienceExpansionEnabled
+          }
+          if (params.offsiteDeliveryEnabled !== undefined) {
+            updateParams.offsiteDeliveryEnabled = params.offsiteDeliveryEnabled
+          }
+
+          const result = await this.marketingService.updateCampaign(
+            params.accountId,
+            params.campaignId,
+            updateParams
+          )
+          return this.createResourceResponse(result)
+        } catch (error) {
+          this.logger.error('Update Campaign Failed', error)
+          throw error
+        }
+      }
+    )
+
+    // Update Campaign Group Tool
+    this.server.tool(
+      'update-campaign-group',
+      'Update a LinkedIn campaign group (budget, schedule, status)',
+      linkedinApiSchemas.updateCampaignGroup,
+      async (params) => {
+        this.logger.info('Updating Campaign Group', { campaignGroupId: params.campaignGroupId })
+        try {
+          await this.ensureAuthenticated()
+          const updateParams: {
+            name?: string
+            status?: string
+            totalBudget?: { amount: string; currencyCode: string } | null
+            runScheduleEnd?: number
+          } = {}
+
+          if (params.name) updateParams.name = params.name
+          if (params.status) updateParams.status = params.status
+          if (params.totalBudgetAmount === 'REMOVE') {
+            updateParams.totalBudget = null
+          } else if (params.totalBudgetAmount && params.totalBudgetCurrency) {
+            updateParams.totalBudget = { amount: params.totalBudgetAmount, currencyCode: params.totalBudgetCurrency }
+          }
+          if (params.endTime) updateParams.runScheduleEnd = params.endTime
+
+          const result = await this.marketingService.updateCampaignGroup(
+            params.accountId,
+            params.campaignGroupId,
+            updateParams
+          )
+          return this.createResourceResponse(result)
+        } catch (error) {
+          this.logger.error('Update Campaign Group Failed', error)
+          throw error
+        }
+      }
+    )
+
+    // ===== Conversions API Tools =====
+
+    // Create Conversion Rule Tool
+    this.server.tool(
+      'create-conversion-rule',
+      'Create a conversion tracking rule for measuring campaign performance',
+      linkedinApiSchemas.createConversionRule,
+      async (params) => {
+        this.logger.info('Creating Conversion Rule', { name: params.name, type: params.type })
+        try {
+          await this.ensureAuthenticated()
+          const result = await this.marketingService.createConversionRule({
+            name: params.name,
+            account: params.account,
+            type: params.type,
+            postClickAttributionWindowSize: parseInt(params.postClickAttributionWindow, 10),
+            viewThroughAttributionWindowSize: parseInt(params.viewThroughAttributionWindow, 10),
+            attributionType: params.attributionType
+          })
+          return this.createResourceResponse(result)
+        } catch (error) {
+          this.logger.error('Create Conversion Rule Failed', error)
+          throw error
+        }
+      }
+    )
+
+    // Get Conversion Rules Tool
+    this.server.tool(
+      'get-conversion-rules',
+      'Get all conversion tracking rules for an ad account',
+      linkedinApiSchemas.getConversionRules,
+      async (params) => {
+        this.logger.info('Getting Conversion Rules', { account: params.account })
+        try {
+          await this.ensureAuthenticated()
+          const result = await this.marketingService.getConversionRules(params.account)
+          return this.createResourceResponse(result)
+        } catch (error) {
+          this.logger.error('Get Conversion Rules Failed', error)
+          throw error
+        }
+      }
+    )
+
+    // Stream Conversion Event Tool
+    this.server.tool(
+      'stream-conversion-event',
+      'Send a conversion event to LinkedIn for attribution tracking',
+      linkedinApiSchemas.streamConversionEvent,
+      async (params) => {
+        this.logger.info('Streaming Conversion Event', { conversionRuleId: params.conversionRuleId })
+        try {
+          await this.ensureAuthenticated()
+          const eventParams: {
+            conversion: string
+            conversionHappenedAt: number
+            userIdType: string
+            userIdValue: string
+            eventId?: string
+            conversionValue?: { currencyCode: string; amount: string }
+            userInfo?: { firstName?: string; lastName?: string; countryCode?: string }
+          } = {
+            conversion: params.conversionRuleId,
+            conversionHappenedAt: params.conversionHappenedAt,
+            userIdType: params.userIdType,
+            userIdValue: params.userIdValue
+          }
+
+          if (params.eventId) eventParams.eventId = params.eventId
+          if (params.conversionValueAmount && params.conversionValueCurrency) {
+            eventParams.conversionValue = {
+              amount: params.conversionValueAmount,
+              currencyCode: params.conversionValueCurrency
+            }
+          }
+          if (params.userFirstName || params.userLastName || params.userCountryCode) {
+            eventParams.userInfo = {}
+            if (params.userFirstName) eventParams.userInfo.firstName = params.userFirstName
+            if (params.userLastName) eventParams.userInfo.lastName = params.userLastName
+            if (params.userCountryCode) eventParams.userInfo.countryCode = params.userCountryCode
+          }
+
+          await this.marketingService.streamConversionEvent(eventParams)
+          return this.createResourceResponse({ success: true, message: 'Conversion event streamed successfully' })
+        } catch (error) {
+          this.logger.error('Stream Conversion Event Failed', error)
+          throw error
+        }
+      }
+    )
+
+    // Associate Campaign Conversion Tool
+    this.server.tool(
+      'associate-campaign-conversion',
+      'Associate a campaign with a conversion tracking rule',
+      linkedinApiSchemas.associateCampaignConversion,
+      async (params) => {
+        this.logger.info('Associating Campaign Conversion', { campaignUrn: params.campaignUrn, conversionUrn: params.conversionUrn })
+        try {
+          await this.ensureAuthenticated()
+          await this.marketingService.associateCampaignConversion(params.campaignUrn, params.conversionUrn)
+          return this.createResourceResponse({ success: true, message: 'Campaign associated with conversion rule' })
+        } catch (error) {
+          this.logger.error('Associate Campaign Conversion Failed', error)
+          throw error
+        }
+      }
+    )
+
+    // ===== Matched Audiences / DMP Segment Tools (requires rw_dmp_segments scope) =====
+
+    // Create Audience Tool
+    this.server.tool(
+      'create-audience',
+      'Create a matched audience segment for targeting (requires rw_dmp_segments scope)',
+      linkedinApiSchemas.createAudience,
+      async (params) => {
+        this.logger.info('Creating Audience', { name: params.name, type: params.type })
+        try {
+          await this.ensureAuthenticated()
+          const result = await this.marketingService.createAudience({
+            account: params.account,
+            name: params.name,
+            type: params.type
+          })
+          return this.createResourceResponse(result)
+        } catch (error) {
+          this.logger.error('Create Audience Failed', error)
+          throw error
+        }
+      }
+    )
+
+    // Get Audiences Tool
+    this.server.tool(
+      'get-audiences',
+      'Get all matched audience segments for an ad account (requires rw_dmp_segments scope)',
+      linkedinApiSchemas.getAudiences,
+      async (params) => {
+        this.logger.info('Getting Audiences', { account: params.account })
+        try {
+          await this.ensureAuthenticated()
+          const result = await this.marketingService.getAudiences(params.account)
+          return this.createResourceResponse(result)
+        } catch (error) {
+          this.logger.error('Get Audiences Failed', error)
+          throw error
+        }
+      }
+    )
+
+    // Add Audience Users Tool
+    this.server.tool(
+      'add-audience-users',
+      'Add hashed email users to a matched audience segment (requires rw_dmp_segments scope)',
+      linkedinApiSchemas.addAudienceUsers,
+      async (params) => {
+        this.logger.info('Adding Audience Users', { segmentId: params.segmentId, userCount: params.users.length })
+        try {
+          await this.ensureAuthenticated()
+          await this.marketingService.addAudienceUsers(params.segmentId, params.users)
+          return this.createResourceResponse({ success: true, message: `${params.users.length} users added to audience` })
+        } catch (error) {
+          this.logger.error('Add Audience Users Failed', error)
+          throw error
+        }
+      }
+    )
+
+    // Add Audience Companies Tool
+    this.server.tool(
+      'add-audience-companies',
+      'Add companies to a matched audience segment for account-based targeting (requires rw_dmp_segments scope)',
+      linkedinApiSchemas.addAudienceCompanies,
+      async (params) => {
+        this.logger.info('Adding Audience Companies', { segmentId: params.segmentId, companyCount: params.companies.length })
+        try {
+          await this.ensureAuthenticated()
+          await this.marketingService.addAudienceCompanies(params.segmentId, params.companies)
+          return this.createResourceResponse({ success: true, message: `${params.companies.length} companies added to audience` })
+        } catch (error) {
+          this.logger.error('Add Audience Companies Failed', error)
+          throw error
+        }
+      }
+    )
   }
 
   private createResourceResponse(data: unknown): McpResourceResponse {

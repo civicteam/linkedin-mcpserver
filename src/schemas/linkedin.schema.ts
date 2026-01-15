@@ -185,5 +185,115 @@ export const linkedinApiSchemas = {
     endDay: z.number().min(1).max(31).describe('End day (1-31)'),
     pivot: z.enum(['ACCOUNT', 'CAMPAIGN', 'CAMPAIGN_GROUP', 'CREATIVE', 'CONVERSION', 'COMPANY', 'MEMBER_COMPANY_SIZE', 'MEMBER_INDUSTRY', 'MEMBER_SENIORITY', 'MEMBER_JOB_TITLE', 'MEMBER_JOB_FUNCTION', 'MEMBER_COUNTRY_REGION']).optional().describe('Dimension to pivot by'),
     timeGranularity: z.enum(['DAILY', 'MONTHLY', 'ALL']).optional().default('ALL').describe('Time granularity for results')
+  },
+
+  // Creative Management (Create/Update/Delete)
+  createCreative: {
+    accountId: z.string().describe('Ad account ID'),
+    campaign: z.string().describe('Campaign URN (e.g., urn:li:sponsoredCampaign:123456)'),
+    contentReference: z.string().optional().describe('Content URN to sponsor (ugcPost or share URN)'),
+    intendedStatus: z.enum(['ACTIVE', 'PAUSED', 'DRAFT']).optional().default('DRAFT').describe('Initial status of the creative'),
+    name: z.string().optional().describe('Name for the creative'),
+    leadgenFormUrn: z.string().optional().describe('Lead gen form URN for LEAD_GENERATION campaigns'),
+    leadgenCallToAction: z.enum(['APPLY', 'DOWNLOAD', 'VIEW_QUOTE', 'LEARN_MORE', 'SIGN_UP', 'SUBSCRIBE', 'REGISTER', 'REQUEST_DEMO', 'JOIN', 'ATTEND', 'UNLOCK_FULL_DOCUMENT']).optional().describe('Call-to-action label for lead gen')
+  },
+
+  updateCreative: {
+    accountId: z.string().describe('Ad account ID'),
+    creativeId: z.string().describe('Creative ID or URN'),
+    intendedStatus: z.enum(['ACTIVE', 'PAUSED', 'DRAFT', 'ARCHIVED', 'PENDING_DELETION']).optional().describe('New status for the creative'),
+    name: z.string().optional().describe('New name for the creative')
+  },
+
+  deleteCreative: {
+    accountId: z.string().describe('Ad account ID'),
+    creativeId: z.string().describe('Creative ID or URN')
+  },
+
+  // Campaign Updates (Budget, Schedule, etc.)
+  updateCampaign: {
+    accountId: z.string().describe('Ad account ID'),
+    campaignId: z.string().describe('Campaign ID'),
+    name: z.string().optional().describe('New campaign name'),
+    status: z.enum(['ACTIVE', 'PAUSED', 'ARCHIVED']).optional().describe('New campaign status'),
+    dailyBudgetAmount: z.string().optional().describe('Daily budget amount (e.g., "100.00")'),
+    dailyBudgetCurrency: z.string().length(3).optional().describe('Currency code for daily budget'),
+    totalBudgetAmount: z.string().optional().describe('Total budget amount (e.g., "1000.00"), use "REMOVE" to set unlimited'),
+    totalBudgetCurrency: z.string().length(3).optional().describe('Currency code for total budget'),
+    unitCostAmount: z.string().optional().describe('Bid amount (e.g., "5.00")'),
+    unitCostCurrency: z.string().length(3).optional().describe('Currency code for unit cost'),
+    endTime: z.number().optional().describe('Unix timestamp for campaign end'),
+    audienceExpansionEnabled: z.boolean().optional().describe('Enable audience expansion'),
+    offsiteDeliveryEnabled: z.boolean().optional().describe('Enable LinkedIn Audience Network')
+  },
+
+  // Campaign Group Updates
+  updateCampaignGroup: {
+    accountId: z.string().describe('Ad account ID'),
+    campaignGroupId: z.string().describe('Campaign group ID'),
+    name: z.string().optional().describe('New campaign group name'),
+    status: z.enum(['ACTIVE', 'PAUSED', 'ARCHIVED']).optional().describe('New campaign group status'),
+    totalBudgetAmount: z.string().optional().describe('Total budget amount (e.g., "1000.00"), use "REMOVE" to set unlimited'),
+    totalBudgetCurrency: z.string().length(3).optional().describe('Currency code for total budget'),
+    endTime: z.number().optional().describe('Unix timestamp for campaign group end')
+  },
+
+  // Conversions API
+  createConversionRule: {
+    name: z.string().describe('Name for the conversion rule'),
+    account: z.string().describe('Ad account URN (e.g., urn:li:sponsoredAccount:123456)'),
+    type: z.enum(['ADD_TO_CART', 'DOWNLOAD', 'INSTALL', 'KEY_PAGE_VIEW', 'LEAD', 'PURCHASE', 'SIGN_UP', 'ADD_BILLING_INFO', 'BOOK_APPOINTMENT', 'COMPLETE_SIGNUP', 'SUBMIT_APPLICATION', 'PHONE_CALL', 'INVITE', 'LOGIN', 'SHARE', 'DONATE', 'ADD_TO_LIST', 'START_TRIAL', 'OUTBOUND_CLICK', 'CONTACT', 'QUALIFIED_LEAD', 'SAVE', 'START_CHECKOUT', 'SCHEDULE', 'VIEW_CONTENT', 'VIEW_VIDEO', 'REQUEST_QUOTE', 'SEARCH', 'SUBSCRIBE', 'AD_CLICK', 'AD_VIEW']).describe('Type of conversion to track'),
+    postClickAttributionWindow: z.enum(['1', '7', '30', '90', '365']).optional().default('30').describe('Post-click attribution window in days'),
+    viewThroughAttributionWindow: z.enum(['1', '7', '30', '90', '365']).optional().default('7').describe('View-through attribution window in days'),
+    attributionType: z.enum(['LAST_TOUCH_BY_CAMPAIGN', 'LAST_TOUCH_BY_CONVERSION']).optional().default('LAST_TOUCH_BY_CAMPAIGN').describe('Attribution model')
+  },
+
+  getConversionRules: {
+    account: z.string().describe('Ad account URN (e.g., urn:li:sponsoredAccount:123456)')
+  },
+
+  streamConversionEvent: {
+    conversionRuleId: z.string().describe('Conversion rule URN (e.g., urn:lla:llaPartnerConversion:123)'),
+    conversionHappenedAt: z.number().describe('Unix timestamp in milliseconds when conversion occurred'),
+    userIdType: z.enum(['SHA256_EMAIL', 'LINKEDIN_FIRST_PARTY_ADS_TRACKING_UUID', 'ACXIOM_ID', 'ORACLE_MOAT_ID']).describe('Type of user identifier'),
+    userIdValue: z.string().describe('User identifier value (e.g., SHA256 hash of email)'),
+    eventId: z.string().optional().describe('Unique event ID for deduplication'),
+    conversionValueAmount: z.string().optional().describe('Conversion value amount (e.g., "50.00")'),
+    conversionValueCurrency: z.string().length(3).optional().describe('Currency code for conversion value'),
+    userFirstName: z.string().optional().describe('User first name for improved matching'),
+    userLastName: z.string().optional().describe('User last name for improved matching'),
+    userCountryCode: z.string().length(2).optional().describe('User country code (e.g., US)')
+  },
+
+  associateCampaignConversion: {
+    campaignUrn: z.string().describe('Campaign URN (e.g., urn:li:sponsoredCampaign:123456)'),
+    conversionUrn: z.string().describe('Conversion rule URN (e.g., urn:lla:llaPartnerConversion:123)')
+  },
+
+  // Matched Audiences / DMP Segments (requires rw_dmp_segments scope)
+  createAudience: {
+    account: z.string().describe('Ad account URN (e.g., urn:li:sponsoredAccount:123456)'),
+    name: z.string().describe('Name for the audience segment'),
+    type: z.enum(['LIST_UPLOAD', 'STREAMING']).describe('Segment type: LIST_UPLOAD for CSV, STREAMING for real-time')
+  },
+
+  getAudiences: {
+    account: z.string().describe('Ad account URN (e.g., urn:li:sponsoredAccount:123456)')
+  },
+
+  addAudienceUsers: {
+    segmentId: z.string().describe('DMP Segment ID'),
+    users: z.array(z.object({
+      idType: z.enum(['SHA256_EMAIL', 'SHA512_EMAIL']).describe('Hash algorithm used'),
+      idValue: z.string().describe('Hashed email value')
+    })).min(1).max(5000).describe('Array of hashed user identifiers (max 5000 per call)')
+  },
+
+  addAudienceCompanies: {
+    segmentId: z.string().describe('DMP Segment ID'),
+    companies: z.array(z.object({
+      companyName: z.string().optional().describe('Company name'),
+      companyDomain: z.string().optional().describe('Company domain (e.g., example.com)')
+    })).min(1).describe('Array of company identifiers')
   }
 }

@@ -11,14 +11,34 @@ import type { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdi
 import { McpResourceResponse } from './types/mcp.js'
 
 /**
+ * Tool categories that can be enabled/disabled via TOOL_CATEGORIES env var
+ *
+ * - share: Basic posting tools (get-my-profile, create-text-post, etc.)
+ * - partner: Partner API tools (search-people, get-profile, search-jobs, etc.)
+ * - marketing: Marketing API tools (ad accounts, campaigns, creatives, analytics)
+ * - conversions: Conversions API tools (conversion rules, events)
+ * - audiences: Matched Audiences/DMP tools (requires rw_dmp_segments scope)
+ */
+type ToolCategory = 'share' | 'partner' | 'marketing' | 'conversions' | 'audiences'
+
+const ALL_CATEGORIES: ToolCategory[] = ['share', 'partner', 'marketing', 'conversions', 'audiences']
+
+/**
  * LinkedInMcpServer - Main server class for LinkedIn MCP integration
  *
  * Manages the MCP server lifecycle and registers LinkedIn-related tools
  * for interacting with LinkedIn's API through the Model Context Protocol.
+ *
+ * Tool categories can be filtered using the TOOL_CATEGORIES environment variable.
+ * Set to a comma-separated list of categories to enable only specific tools.
+ * Example: TOOL_CATEGORIES=share,marketing
+ *
+ * If not set, all categories are enabled by default.
  */
 @injectable()
 export class LinkedInMcpServer {
   private readonly server: McpServer
+  private readonly enabledCategories: Set<ToolCategory>
 
   constructor(
     @inject(ClientService) private readonly clientService: ClientService,
@@ -26,11 +46,13 @@ export class LinkedInMcpServer {
     @inject(TokenService) private readonly tokenService: TokenService,
     @inject(LoggerService) private readonly logger: LoggerService
   ) {
+    this.enabledCategories = this.parseToolCategories()
     this.server = new McpServer({
       name: process.env.MCP_SERVER_NAME ?? 'linkedin-mcpserver',
       version: process.env.MCP_SERVER_VERSION ?? '0.1.0',
       port: process.env.MCP_SERVER_PORT ?? 5050
     })
+    this.logger.info('Registering tools for categories', { categories: Array.from(this.enabledCategories) })
     this.registerTools();
 
     (async () => {
@@ -85,217 +107,258 @@ export class LinkedInMcpServer {
   }
 
   /**
+   * Parses the TOOL_CATEGORIES environment variable
+   * Returns a Set of enabled categories, defaulting to all if not set
+   */
+  private parseToolCategories(): Set<ToolCategory> {
+    const envValue = process.env.TOOL_CATEGORIES?.trim()
+
+    if (!envValue) {
+      return new Set(ALL_CATEGORIES)
+    }
+
+    const categories = envValue
+      .split(',')
+      .map(c => c.trim().toLowerCase())
+      .filter((c): c is ToolCategory => ALL_CATEGORIES.includes(c as ToolCategory))
+
+    if (categories.length === 0) {
+      this.logger.warn('No valid TOOL_CATEGORIES found, enabling all categories', {
+        provided: envValue,
+        valid: ALL_CATEGORIES
+      })
+      return new Set(ALL_CATEGORIES)
+    }
+
+    return new Set(categories)
+  }
+
+  /**
+   * Checks if a tool category is enabled
+   */
+  private isCategoryEnabled(category: ToolCategory): boolean {
+    return this.enabledCategories.has(category)
+  }
+
+  /**
    * Register MCP tools for LinkedIn API interactions
    * Implements tool definitions for various LinkedIn data operations
+   * Only registers tools for enabled categories (via TOOL_CATEGORIES env var)
    */
   private registerTools(): void {
-    // Search People Tool
-    this.server.tool(
-      'search-people',
-      'Search for LinkedIn profiles based on various criteria',
-      linkedinApiSchemas.searchPeople,
-      async (params) => {
-        this.logger.info('Executing LinkedIn People Search', { keywords: params.keywords })
-        try {
-          await this.ensureAuthenticated()
-          const results = await this.clientService.searchPeople(params)
-          return this.createResourceResponse(results)
-        } catch (error) {
-          this.logger.error('LinkedIn People Search Failed', error)
-          throw error
+    // ===== Partner API Tools (Requires Partner Program Membership) =====
+    if (this.isCategoryEnabled('partner')) {
+      // Search People Tool
+      this.server.tool(
+        'search-people',
+        'Search for LinkedIn profiles based on various criteria',
+        linkedinApiSchemas.searchPeople,
+        async (params) => {
+          this.logger.info('Executing LinkedIn People Search', { keywords: params.keywords })
+          try {
+            await this.ensureAuthenticated()
+            const results = await this.clientService.searchPeople(params)
+            return this.createResourceResponse(results)
+          } catch (error) {
+            this.logger.error('LinkedIn People Search Failed', error)
+            throw error
+          }
         }
-      }
-    )
+      )
 
-    // Get Profile Tool
-    this.server.tool(
-      'get-profile',
-      'Retrieve detailed LinkedIn profile information',
-      linkedinApiSchemas.getProfile,
-      async (params) => {
-        this.logger.info('Retrieving LinkedIn Profile', {
-          publicId: params.publicId,
-          urnId: params.urnId
-        })
-        try {
-          await this.ensureAuthenticated()
-          const profile = await this.clientService.getProfile(params)
-          return this.createResourceResponse(profile)
-        } catch (error) {
-          this.logger.error('LinkedIn Profile Retrieval Failed', error)
-          throw error
+      // Get Profile Tool
+      this.server.tool(
+        'get-profile',
+        'Retrieve detailed LinkedIn profile information',
+        linkedinApiSchemas.getProfile,
+        async (params) => {
+          this.logger.info('Retrieving LinkedIn Profile', {
+            publicId: params.publicId,
+            urnId: params.urnId
+          })
+          try {
+            await this.ensureAuthenticated()
+            const profile = await this.clientService.getProfile(params)
+            return this.createResourceResponse(profile)
+          } catch (error) {
+            this.logger.error('LinkedIn Profile Retrieval Failed', error)
+            throw error
+          }
         }
-      }
-    )
+      )
 
-    // Search Jobs Tool
-    this.server.tool(
-      'search-jobs',
-      'Search for LinkedIn job postings based on various criteria',
-      linkedinApiSchemas.searchJobs,
-      async (params) => {
-        this.logger.info('Executing LinkedIn Job Search', {
-          keywords: params.keywords,
-          location: params.location
-        })
-        try {
-          await this.ensureAuthenticated()
-          const jobs = await this.clientService.searchJobs(params)
-          return this.createResourceResponse(jobs)
-        } catch (error) {
-          this.logger.error('LinkedIn Job Search Failed', error)
-          throw error
+      // Search Jobs Tool
+      this.server.tool(
+        'search-jobs',
+        'Search for LinkedIn job postings based on various criteria',
+        linkedinApiSchemas.searchJobs,
+        async (params) => {
+          this.logger.info('Executing LinkedIn Job Search', {
+            keywords: params.keywords,
+            location: params.location
+          })
+          try {
+            await this.ensureAuthenticated()
+            const jobs = await this.clientService.searchJobs(params)
+            return this.createResourceResponse(jobs)
+          } catch (error) {
+            this.logger.error('LinkedIn Job Search Failed', error)
+            throw error
+          }
         }
-      }
-    )
+      )
 
-    // Send Message Tool
-    this.server.tool(
-      'send-message',
-      'Send a message to a LinkedIn connection',
-      linkedinApiSchemas.sendMessage,
-      async (params) => {
-        this.logger.info('Sending LinkedIn Message', {
-          recipientUrn: params.recipientUrn
-        })
-        try {
-          await this.ensureAuthenticated()
-          const result = await this.clientService.sendMessage(params)
-          return this.createResourceResponse(result)
-        } catch (error) {
-          this.logger.error('LinkedIn Message Sending Failed', error)
-          throw error
+      // Send Message Tool
+      this.server.tool(
+        'send-message',
+        'Send a message to a LinkedIn connection',
+        linkedinApiSchemas.sendMessage,
+        async (params) => {
+          this.logger.info('Sending LinkedIn Message', {
+            recipientUrn: params.recipientUrn
+          })
+          try {
+            await this.ensureAuthenticated()
+            const result = await this.clientService.sendMessage(params)
+            return this.createResourceResponse(result)
+          } catch (error) {
+            this.logger.error('LinkedIn Message Sending Failed', error)
+            throw error
+          }
         }
-      }
-    )
+      )
 
-    // Get My Profile Tool
-    this.server.tool(
-      'get-my-profile',
-      "Retrieve the current user's LinkedIn profile information",
-      linkedinApiSchemas.emptyParams,
-      async () => {
-        this.logger.info('Retrieving Current User Profile')
-        try {
-          await this.ensureAuthenticated()
-          const profile = await this.clientService.getMyProfile()
-          return this.createResourceResponse(profile)
-        } catch (error) {
-          this.logger.error('Current User Profile Retrieval Failed', error)
-          throw error
+      // Get Network Statistics Tool
+      this.server.tool(
+        'get-network-stats',
+        'Retrieve network statistics for the current user',
+        linkedinApiSchemas.emptyParams,
+        async () => {
+          this.logger.info('Retrieving Network Statistics')
+          try {
+            await this.ensureAuthenticated()
+            const stats = await this.clientService.getNetworkStats()
+            return this.createResourceResponse(stats)
+          } catch (error) {
+            this.logger.error('Network Statistics Retrieval Failed', error)
+            throw error
+          }
         }
-      }
-    )
+      )
 
-    // Get Network Statistics Tool
-    this.server.tool(
-      'get-network-stats',
-      'Retrieve network statistics for the current user',
-      linkedinApiSchemas.emptyParams,
-      async () => {
-        this.logger.info('Retrieving Network Statistics')
-        try {
-          await this.ensureAuthenticated()
-          const stats = await this.clientService.getNetworkStats()
-          return this.createResourceResponse(stats)
-        } catch (error) {
-          this.logger.error('Network Statistics Retrieval Failed', error)
-          throw error
+      // Get Connections Tool
+      this.server.tool(
+        'get-connections',
+        'Retrieve the current user connections',
+        linkedinApiSchemas.emptyParams,
+        async () => {
+          this.logger.info('Retrieving User Connections')
+          try {
+            await this.ensureAuthenticated()
+            const connections = await this.clientService.getConnections()
+            return this.createResourceResponse(connections)
+          } catch (error) {
+            this.logger.error('User Connections Retrieval Failed', error)
+            throw error
+          }
         }
-      }
-    )
+      )
+    }
 
-    // Get Connections Tool
-    this.server.tool(
-      'get-connections',
-      'Retrieve the current user connections',
-      linkedinApiSchemas.emptyParams,
-      async () => {
-        this.logger.info('Retrieving User Connections')
-        try {
-          await this.ensureAuthenticated()
-          const connections = await this.clientService.getConnections()
-          return this.createResourceResponse(connections)
-        } catch (error) {
-          this.logger.error('User Connections Retrieval Failed', error)
-          throw error
+    // ===== Share API Tools (Standard OAuth) =====
+    if (this.isCategoryEnabled('share')) {
+      // Get My Profile Tool
+      this.server.tool(
+        'get-my-profile',
+        "Retrieve the current user's LinkedIn profile information",
+        linkedinApiSchemas.emptyParams,
+        async () => {
+          this.logger.info('Retrieving Current User Profile')
+          try {
+            await this.ensureAuthenticated()
+            const profile = await this.clientService.getMyProfile()
+            return this.createResourceResponse(profile)
+          } catch (error) {
+            this.logger.error('Current User Profile Retrieval Failed', error)
+            throw error
+          }
         }
-      }
-    )
+      )
 
-    // Create Text Post Tool
-    this.server.tool(
-      'create-text-post',
-      'Create a text-only post on LinkedIn',
-      linkedinApiSchemas.createTextPost,
-      async (params) => {
-        this.logger.info('Creating LinkedIn Text Post')
-        try {
-          await this.ensureAuthenticated()
-          const result = await this.clientService.createTextPost(params)
-          return this.createResourceResponse(result)
-        } catch (error) {
-          this.logger.error('LinkedIn Text Post Creation Failed', error)
-          throw error
+      // Create Text Post Tool
+      this.server.tool(
+        'create-text-post',
+        'Create a text-only post on LinkedIn',
+        linkedinApiSchemas.createTextPost,
+        async (params) => {
+          this.logger.info('Creating LinkedIn Text Post')
+          try {
+            await this.ensureAuthenticated()
+            const result = await this.clientService.createTextPost(params)
+            return this.createResourceResponse(result)
+          } catch (error) {
+            this.logger.error('LinkedIn Text Post Creation Failed', error)
+            throw error
+          }
         }
-      }
-    )
+      )
 
-    // Create Article Share Tool
-    this.server.tool(
-      'create-article-share',
-      'Share an article/URL on LinkedIn with optional commentary',
-      linkedinApiSchemas.createArticleShare,
-      async (params) => {
-        this.logger.info('Creating LinkedIn Article Share', { url: params.url })
-        try {
-          await this.ensureAuthenticated()
-          const result = await this.clientService.createArticleShare(params)
-          return this.createResourceResponse(result)
-        } catch (error) {
-          this.logger.error('LinkedIn Article Share Creation Failed', error)
-          throw error
+      // Create Article Share Tool
+      this.server.tool(
+        'create-article-share',
+        'Share an article/URL on LinkedIn with optional commentary',
+        linkedinApiSchemas.createArticleShare,
+        async (params) => {
+          this.logger.info('Creating LinkedIn Article Share', { url: params.url })
+          try {
+            await this.ensureAuthenticated()
+            const result = await this.clientService.createArticleShare(params)
+            return this.createResourceResponse(result)
+          } catch (error) {
+            this.logger.error('LinkedIn Article Share Creation Failed', error)
+            throw error
+          }
         }
-      }
-    )
+      )
 
-    // Create Image Share Tool
-    this.server.tool(
-      'create-image-share',
-      'Share an image on LinkedIn with optional commentary',
-      linkedinApiSchemas.createImageShare,
-      async (params) => {
-        this.logger.info('Creating LinkedIn Image Share', { imageUrl: params.imageUrl })
-        try {
-          await this.ensureAuthenticated()
-          const result = await this.clientService.createImageShare(params)
-          return this.createResourceResponse(result)
-        } catch (error) {
-          this.logger.error('LinkedIn Image Share Creation Failed', error)
-          throw error
+      // Create Image Share Tool
+      this.server.tool(
+        'create-image-share',
+        'Share an image on LinkedIn with optional commentary',
+        linkedinApiSchemas.createImageShare,
+        async (params) => {
+          this.logger.info('Creating LinkedIn Image Share', { imageUrl: params.imageUrl })
+          try {
+            await this.ensureAuthenticated()
+            const result = await this.clientService.createImageShare(params)
+            return this.createResourceResponse(result)
+          } catch (error) {
+            this.logger.error('LinkedIn Image Share Creation Failed', error)
+            throw error
+          }
         }
-      }
-    )
+      )
+    }
 
     // ===== Marketing API Tools (Requires Marketing API Access) =====
-
-    // Search Ad Accounts Tool
-    this.server.tool(
-      'search-ad-accounts',
-      'Search for accessible LinkedIn ad accounts',
-      linkedinApiSchemas.searchAdAccounts,
-      async (params) => {
-        this.logger.info('Searching Ad Accounts')
-        try {
-          await this.ensureAuthenticated()
-          const result = await this.marketingService.searchAdAccounts(params)
-          return this.createResourceResponse(result)
-        } catch (error) {
-          this.logger.error('Ad Accounts Search Failed', error)
-          throw error
+    if (this.isCategoryEnabled('marketing')) {
+      // Search Ad Accounts Tool
+      this.server.tool(
+        'search-ad-accounts',
+        'Search for accessible LinkedIn ad accounts',
+        linkedinApiSchemas.searchAdAccounts,
+        async (params) => {
+          this.logger.info('Searching Ad Accounts')
+          try {
+            await this.ensureAuthenticated()
+            const result = await this.marketingService.searchAdAccounts(params)
+            return this.createResourceResponse(result)
+          } catch (error) {
+            this.logger.error('Ad Accounts Search Failed', error)
+            throw error
+          }
         }
-      }
-    )
+      )
 
     // Get Ad Account Tool
     this.server.tool(
@@ -532,11 +595,11 @@ export class LinkedInMcpServer {
       }
     )
 
-    // ===== Creative Management Tools =====
+      // ===== Creative Management Tools =====
 
-    // Create Creative Tool
-    this.server.tool(
-      'create-creative',
+      // Create Creative Tool
+      this.server.tool(
+        'create-creative',
       'Create a new creative (ad) in a LinkedIn campaign',
       linkedinApiSchemas.createCreative,
       async (params) => {
@@ -696,11 +759,13 @@ export class LinkedInMcpServer {
       }
     )
 
-    // ===== Conversions API Tools =====
+    } // End marketing category
 
-    // Create Conversion Rule Tool
-    this.server.tool(
-      'create-conversion-rule',
+    // ===== Conversions API Tools =====
+    if (this.isCategoryEnabled('conversions')) {
+      // Create Conversion Rule Tool
+      this.server.tool(
+        'create-conversion-rule',
       'Create a conversion tracking rule for measuring campaign performance',
       linkedinApiSchemas.createConversionRule,
       async (params) => {
@@ -806,11 +871,13 @@ export class LinkedInMcpServer {
       }
     )
 
-    // ===== Matched Audiences / DMP Segment Tools (requires rw_dmp_segments scope) =====
+    } // End conversions category
 
-    // Create Audience Tool
-    this.server.tool(
-      'create-audience',
+    // ===== Matched Audiences / DMP Segment Tools (requires rw_dmp_segments scope) =====
+    if (this.isCategoryEnabled('audiences')) {
+      // Create Audience Tool
+      this.server.tool(
+        'create-audience',
       'Create a matched audience segment for targeting (requires rw_dmp_segments scope)',
       linkedinApiSchemas.createAudience,
       async (params) => {
@@ -866,23 +933,24 @@ export class LinkedInMcpServer {
       }
     )
 
-    // Add Audience Companies Tool
-    this.server.tool(
-      'add-audience-companies',
-      'Add companies to a matched audience segment for account-based targeting (requires rw_dmp_segments scope)',
-      linkedinApiSchemas.addAudienceCompanies,
-      async (params) => {
-        this.logger.info('Adding Audience Companies', { segmentId: params.segmentId, companyCount: params.companies.length })
-        try {
-          await this.ensureAuthenticated()
-          await this.marketingService.addAudienceCompanies(params.segmentId, params.companies)
-          return this.createResourceResponse({ success: true, message: `${params.companies.length} companies added to audience` })
-        } catch (error) {
-          this.logger.error('Add Audience Companies Failed', error)
-          throw error
+      // Add Audience Companies Tool
+      this.server.tool(
+        'add-audience-companies',
+        'Add companies to a matched audience segment for account-based targeting (requires rw_dmp_segments scope)',
+        linkedinApiSchemas.addAudienceCompanies,
+        async (params) => {
+          this.logger.info('Adding Audience Companies', { segmentId: params.segmentId, companyCount: params.companies.length })
+          try {
+            await this.ensureAuthenticated()
+            await this.marketingService.addAudienceCompanies(params.segmentId, params.companies)
+            return this.createResourceResponse({ success: true, message: `${params.companies.length} companies added to audience` })
+          } catch (error) {
+            this.logger.error('Add Audience Companies Failed', error)
+            throw error
+          }
         }
-      }
-    )
+      )
+    } // End audiences category
   }
 
   private createResourceResponse(data: unknown): McpResourceResponse {

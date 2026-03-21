@@ -1,4 +1,4 @@
-import pino, { type Logger, type Bindings } from 'pino'
+import { pino, type Logger, type Bindings } from 'pino'
 import { injectable, singleton } from 'tsyringe'
 import { ILogger } from '../types/logger.js'
 

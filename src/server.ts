@@ -50,7 +50,6 @@ export class LinkedInMcpServer {
     this.server = new McpServer({
       name: process.env.MCP_SERVER_NAME ?? 'linkedin-mcpserver',
       version: process.env.MCP_SERVER_VERSION ?? '0.1.0',
-      port: process.env.MCP_SERVER_PORT ?? 5050
     })
     this.logger.info('Registering tools for categories', { categories: Array.from(this.enabledCategories) })
     this.registerTools();

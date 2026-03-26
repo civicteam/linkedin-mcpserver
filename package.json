@@ -11,7 +11,7 @@
     "build"
   ],
   "scripts": {
-    "build": "tsc && node --env-file=.env -e \"require('fs').chmodSync('build/main.js', '755')\"",
+    "build": "tsc && chmod 755 build/main.js",
     "inspector": "npx @modelcontextprotocol/inspector build/main.js",
     "start:dev": "tsx --env-file=.env src/main.ts"
   },

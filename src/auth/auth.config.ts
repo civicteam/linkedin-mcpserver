@@ -1,4 +1,4 @@
-import { envSchema } from 'schemas/env.schema.js'
+import { envSchema } from '../schemas/env.schema.js'
 import { inject, injectable } from 'tsyringe'
 import { z } from 'zod'
 import { LoggerService } from '../services/logger.service.js'
@@ -22,8 +22,8 @@ import { LoggerService } from '../services/logger.service.js'
 @injectable()
 export class AuthConfig {
   private readonly authUrl: string = 'https://www.linkedin.com/oauth/v2'
-  private readonly clientId: string
-  private readonly clientSecret: string
+  private readonly clientId?: string
+  private readonly clientSecret?: string
   private readonly configurationValidationSchema = envSchema
 
   constructor(@inject(LoggerService) private readonly logger: LoggerService) {
@@ -35,17 +35,17 @@ export class AuthConfig {
 
   /**
    * Gets the client ID for authentication
-   * @returns The LinkedIn API client ID
+   * @returns The LinkedIn API client ID (undefined if using pre-existing tokens)
    */
-  public getClientId(): string {
+  public getClientId(): string | undefined {
     return this.clientId
   }
 
   /**
    * Gets the client secret for authentication
-   * @returns The LinkedIn API client secret
+   * @returns The LinkedIn API client secret (undefined if using pre-existing tokens)
    */
-  public getClientSecret(): string {
+  public getClientSecret(): string | undefined {
     return this.clientSecret
   }
 

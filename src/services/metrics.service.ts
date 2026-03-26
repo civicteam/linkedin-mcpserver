@@ -1,5 +1,5 @@
 import { injectable, singleton } from 'tsyringe'
-import { DetailedMetrics, MetricCategory, MetricData } from 'types/metrics.js'
+import { DetailedMetrics, MetricCategory, MetricData } from '../types/metrics.js'
 
 /**
  * MetricsService - Collects and analyzes application performance metrics

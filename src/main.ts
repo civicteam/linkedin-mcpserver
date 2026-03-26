@@ -3,8 +3,8 @@ import 'reflect-metadata'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { container } from 'tsyringe'
 
-import { setupContainer } from 'container.js'
-import { setupShutdownHandlers } from 'utils/shutdown.utils.js'
+import { setupContainer } from './container.js'
+import { setupShutdownHandlers } from './utils/shutdown.utils.js'
 import { LinkedInMcpServer } from './server.js'
 import { LoggerService } from './services/logger.service.js'
 
@@ -24,6 +24,9 @@ async function main(): Promise<void> {
     const server = container.resolve(LinkedInMcpServer)
     setupShutdownHandlers(server, logger)
     const transport = new StdioServerTransport()
+
+
+
     await server.start(transport)
   } catch (error) {
     const logger = container.isRegistered(LoggerService) ? container.resolve(LoggerService) : console

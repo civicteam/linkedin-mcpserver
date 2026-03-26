@@ -12,11 +12,29 @@ MCP (Model Context Protocol) is an open protocol that standardizes how applicati
 
 ### 🔍 LinkedIn API Tools
 
-- **Profile Search** - Find LinkedIn profiles with advanced filters
-- **Profile Retrieval** - Get detailed information about LinkedIn profiles
-- **Job Search** - Discover job opportunities with customized criteria
-- **Messaging** - Send messages to LinkedIn connections
-- **Network Stats** - Access connection statistics and analytics
+#### Available with Standard OAuth (Working Now)
+
+- ✅ **Get My Profile** - Retrieve your own LinkedIn profile information (name, picture, location)
+- ✅ **Create Text Post** - Share text-only posts on LinkedIn
+- ✅ **Create Article Share** - Share articles/URLs with optional commentary
+- ✅ **Create Image Share** - Share images with optional commentary (3-step upload process)
+
+#### Requires LinkedIn Partner API Access
+
+⚠️ **Note**: The following features require LinkedIn Partner Program approval. Partner API access requires:
+- Incorporated company
+- 3-6 month application review process
+- <10% approval rate
+- No sandbox environment available
+
+- 🔒 **Profile Search** - Find LinkedIn profiles with advanced filters (requires Partner API)
+- 🔒 **Profile Retrieval** - Get detailed information about other LinkedIn profiles (requires Partner API)
+- 🔒 **Job Search** - Discover job opportunities with customized criteria (requires Partner API)
+- 🔒 **Messaging** - Send messages to LinkedIn connections (requires Partner API)
+- 🔒 **Network Stats** - Access connection statistics and analytics (requires Partner API + `r_1st_connections_size` scope)
+- 🔒 **Get Connections** - List your LinkedIn connections (requires Partner API + `r_1st_connections_size` scope)
+
+**Partner API Application**: [LinkedIn Partner Program](https://docs.microsoft.com/en-us/linkedin/shared/references/partner-program)
 
 ### 🛠️ Technical Highlights
 

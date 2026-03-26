@@ -1,6 +1,6 @@
-import { pino } from 'pino'
+import { pino, type Logger, type Bindings } from 'pino'
 import { injectable, singleton } from 'tsyringe'
-import { ILogger } from 'types/logger.js'
+import { ILogger } from '../types/logger.js'
 
 /**
  * LoggerService - Centralized logging service using Pino
@@ -22,7 +22,7 @@ import { ILogger } from 'types/logger.js'
 @injectable()
 @singleton()
 export class LoggerService implements ILogger {
-  private logger: pino.Logger
+  private logger: Logger
 
   constructor() {
     this.logger = pino({
@@ -68,7 +68,7 @@ export class LoggerService implements ILogger {
   }
 
   /** @inheritdoc */
-  public child(bindings: pino.Bindings): LoggerService {
+  public child(bindings: Bindings): LoggerService {
     const childService = new LoggerService()
     childService.logger = this.logger.child(bindings)
     return childService

@@ -22,10 +22,12 @@ import { LoggerService } from './logger.service.js'
  */
 @injectable()
 export class TokenService {
-  private accessToken: string | null = null
+  private accessToken: string | null = process.env.ACCESS_TOKEN || null
   private readonly EXPIRY_THRESHOLD = 5 * 60 * 1000
-  private refreshToken: string | null = null
-  private tokenExpiry: number | null = null
+  private refreshToken: string | null = process.env.REFRESH_TOKEN || null
+  private tokenExpiry: number | null = process.env.ACCESS_TOKEN_EXPIRES_IN
+    ? Date.now() + parseInt(process.env.ACCESS_TOKEN_EXPIRES_IN) * 1000
+    : null
 
   private readonly getAuthUrl = _.memoize(() => this.config.getAuthUrl())
   private readonly getClientId = _.memoize(() => this.config.getClientId())
@@ -73,7 +75,7 @@ export class TokenService {
    * @returns True if a valid token exists
    */
   private hasValidToken(): boolean {
-    return !!(this.accessToken && this.tokenExpiry && Date.now() < this.tokenExpiry)
+    return !!(this.accessToken && (this.tokenExpiry ? (Date.now() < this.tokenExpiry) : true))
   }
 
   /**
@@ -81,7 +83,7 @@ export class TokenService {
    * @returns True if token will expire soon
    */
   private isTokenExpiringSoon(): boolean {
-    return this.tokenExpiry ? this.tokenExpiry - Date.now() < this.EXPIRY_THRESHOLD : true
+    return this.tokenExpiry ? this.tokenExpiry - Date.now() < this.EXPIRY_THRESHOLD : false
   }
 
   /**
@@ -90,9 +92,16 @@ export class TokenService {
    */
   private async fetchToken(grantType: 'client_credentials' | 'refresh_token'): Promise<void> {
     try {
+      const clientId = this.getClientId()
+      const clientSecret = this.getClientSecret()
+
+      if (!clientId || !clientSecret) {
+        throw new Error('Client credentials not configured. Cannot refresh token without LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET.')
+      }
+
       const params: Record<string, string> = {
-        client_id: this.getClientId(),
-        client_secret: this.getClientSecret(),
+        client_id: clientId,
+        client_secret: clientSecret,
         grant_type: grantType
       }
 

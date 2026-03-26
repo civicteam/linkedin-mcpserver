@@ -33,6 +33,8 @@ COPY --from=builder /app/package.json ./package.json
 RUN adduser -D mcpuser && chown -R mcpuser:mcpuser /app
 USER mcpuser
 
+ENV LINKEDIN_CLIENT_ID=""
+ENV LINKEDIN_CLIENT_SECRET=""
 ENV NODE_ENV=production
 
 CMD ["node", "build/main.js"]

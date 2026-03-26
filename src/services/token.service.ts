@@ -57,7 +57,6 @@ export class TokenService {
    * @throws Error if not authenticated
    */
   public getAccessToken(): string {
-    console.log('Accessing token:', this.accessToken)
     if (!this.accessToken) {
       this.logger.warn('Unauthorized token access attempt.')
       throw new Error('Authentication required. Please call authenticate() first.')

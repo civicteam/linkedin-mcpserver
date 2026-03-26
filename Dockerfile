@@ -9,6 +9,9 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
+# Re-install production-only deps so devDependencies (picomatch, eslint, etc.) are excluded
+RUN rm -rf node_modules && npm ci --omit=dev
+
 ### Production stage — runtime only, no npm/headers/source/devDeps
 FROM node:24-alpine@sha256:cd6fb7efa6490f039f3471a189214d5f548c11df1ff9e5b181aa49e22c14383e AS runner
 
